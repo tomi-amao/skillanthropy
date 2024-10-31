@@ -205,3 +205,45 @@ export const AddIcon = () => {
     </svg>
   );
 };
+
+export const FilterIcon = () => {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      height="20px"
+      viewBox="0 -960 960 960"
+      width="20px"
+      fill="#836953"
+    >
+      <path d="M400-240v-80h160v80H400ZM240-440v-80h480v80H240ZM120-640v-80h720v80H120Z" />
+    </svg>
+  );
+};
+
+export const CloseIcon = () => {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      height="16px"
+      viewBox="0 -960 960 960"
+      width="16px"
+      fill="#B3261E"
+    >
+      <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z" />
+    </svg>
+  );
+};
+
+export const SortIcon = () => {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      height="20px"
+      viewBox="0 -960 960 960"
+      width="20px"
+      fill="#836953"
+    >
+      <path d="M120-240v-80h240v80H120Zm0-200v-80h480v80H120Zm0-200v-80h720v80H120Z" />
+    </svg>
+  );
+};

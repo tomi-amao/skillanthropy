@@ -1,3 +1,14 @@
+interface ButtonProps {
+  text: string;
+  name?: string;
+  value?: string;
+  action?: () => void;
+  ariaLabel: string;
+  form?: string;
+  type?: "submit" | "reset" | "button" | undefined;
+  icon?: JSX.Element;
+}
+
 export function PrimaryButton({
   text,
   name,
@@ -6,15 +17,8 @@ export function PrimaryButton({
   ariaLabel,
   form = undefined,
   type = "submit",
-}: {
-  text: string;
-  name?: string;
-  value?: string;
-  action?: () => Record<string, never>;
-  ariaLabel: string;
-  form?: string;
-  type?: "submit" | "reset" | "button" | undefined;
-}) {
+  icon = undefined,
+}: ButtonProps) {
   return (
     <>
       <button
@@ -26,6 +30,8 @@ export function PrimaryButton({
         onClick={action}
         form={form}
       >
+        {icon && <span> {icon}</span>}
+
         {text}
       </button>
     </>
@@ -39,14 +45,8 @@ export function SecondaryButton({
   action = undefined,
   ariaLabel,
   type,
-}: {
-  text: string;
-  name?: string;
-  value?: string;
-  action?: () => void;
-  ariaLabel: string;
-  type?: "submit" | "reset" | "button" | undefined;
-}) {
+  icon = undefined,
+}: ButtonProps) {
   return (
     <>
       <button
@@ -57,6 +57,35 @@ export function SecondaryButton({
         value={value}
         onClick={action}
       >
+        {icon && <span> {icon}</span>}
+
+        {text}
+      </button>
+    </>
+  );
+}
+
+export function SecondaryButtonAlt({
+  text,
+  name,
+  value,
+  action = undefined,
+  ariaLabel,
+  type,
+  icon = undefined,
+}: ButtonProps) {
+  return (
+    <>
+      <button
+        className="flex rounded-md p-2 px-4 w-fit h-fit font-primary text-baseSecondary  hover:bg-basePrimaryDark hover:text-baseSecondary border border-baseSecondary"
+        aria-label={ariaLabel}
+        type={type}
+        name={name}
+        value={value}
+        onClick={action}
+      >
+        {icon && <span> {icon}</span>}
+
         {text}
       </button>
     </>
@@ -69,23 +98,20 @@ export function CancelButton({
   value,
   action = undefined,
   ariaLabel,
-}: {
-  text: string;
-  name?: string;
-  value?: string;
-  action?: () => Record<string, never>;
-  ariaLabel: string;
-}) {
+  icon,
+}: ButtonProps) {
   return (
     <>
       <button
-        className="flex  rounded-md p-2 px-4"
+        className="flex  rounded-md p-2 px-2 text-dangerPrimary   items-center space-x-2 text-sm"
         aria-label={ariaLabel}
         type="submit"
         name={name}
         value={value}
         onClick={action}
       >
+        {icon && <span> {icon}</span>}
+
         {text}
       </button>
     </>

@@ -1,9 +1,9 @@
 import DashboardBanner, {
-  BannerItem,
+  BannerItemProps,
 } from "~/components/cards/BannerSummaryCard";
 
 export default function DashboardHome() {
-  const bannerItems: BannerItem[] = [
+  const bannerItems: BannerItemProps[] = [
     {
       title: "Recommended Tasks",
       value: "Create a Fundraising Platform for Charity X",

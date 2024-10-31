@@ -3,15 +3,13 @@ import { CheckIcon } from "./icons";
 
 interface DropdownProps {
   options: string[];
-  onSelect: (option: string, selected: string) => void;
+  onSelect: (option: string, selected: boolean) => void;
   placeholder?: string;
   multipleSelect: boolean;
-}
-
-interface DropdownOptions {
-  option: string;
-  index: number;
-  selected: boolean;
+  horizontal?: boolean;
+  isActive?: boolean;
+  onDropdownToggle?: () => void;
+  defaultSelected?: string[]; // Add this to handle parent-controlled selections
 }
 
 const Dropdown: React.FC<DropdownProps> = ({
@@ -19,108 +17,130 @@ const Dropdown: React.FC<DropdownProps> = ({
   onSelect,
   placeholder = "Select an option",
   multipleSelect,
+  horizontal = false,
+  isActive = false,
+  onDropdownToggle,
+  defaultSelected = [],
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
-  const [dropDownOptions, setDropDownOptions] = useState<
-    DropdownOptions[] | null
-  >(null);
+  // Initialize selectedOptions with defaultSelected
+  const [internalSelectedOptions, setInternalSelectedOptions] =
+    useState<string[]>(defaultSelected);
+
+  // Update internal state when defaultSelected changes
+  useEffect(() => {
+    setInternalSelectedOptions(defaultSelected);
+  }, [defaultSelected]);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // create a new array with selected property to know when option is selected
-  useEffect(() => {
-    const optionsWithSelect = options.map((option, index) => {
-      return { option, index, selected: false };
-    });
-    setDropDownOptions(optionsWithSelect);
-  }, []);
+  const handleSelect = (option: string) => {
+    const isSelected = internalSelectedOptions.includes(option);
+
+    // create new selection state
+    const newSelectedOptions = isSelected
+      ? internalSelectedOptions.filter((item) => item !== option)
+      : [...internalSelectedOptions, option];
+
+    // Update internal state
+    setInternalSelectedOptions(newSelectedOptions);
+
+    // Notify parent
+    onSelect(option, !isSelected);
+
+    if (!multipleSelect) {
+      onDropdownToggle?.();
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // returns true if the dropdown element contains the clicked element and false if the click was outside of the dropdown
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node)
       ) {
-        setIsOpen(false);
+        onDropdownToggle?.();
       }
     };
-    // attaches the handleClickOutside function as a listener for the mousedown event on the entire document
-    document.addEventListener("mousedown", handleClickOutside);
+
+    if (isActive) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, []);
+  }, [isActive, onDropdownToggle]);
 
-  const handleToggle = () => setIsOpen(!isOpen);
-
-  const handleSelect = (option: string, selected: string) => {
-    setSelectedOption(option);
-    onSelect(option, selected);
+  // Get display text for the button
+  const getDisplayText = () => {
     if (!multipleSelect) {
-      setIsOpen(false);
+      return internalSelectedOptions[0] != "" &&
+        internalSelectedOptions.length > 0
+        ? internalSelectedOptions
+        : placeholder;
     }
-    // update dropdown options array based on clicked option by toggling the selected value
-    if (multipleSelect) {
-      setDropDownOptions((prevOptions) => {
-        if (!prevOptions) return null;
-        return prevOptions?.map((optionObj) =>
-          optionObj.option === option
-            ? { ...optionObj, selected: !optionObj.selected }
-            : optionObj,
-        );
-      });
+    if (internalSelectedOptions.length === 0) {
+      return placeholder;
     }
+    return ` ${internalSelectedOptions.length} selected`;
   };
 
   return (
-    <div ref={dropdownRef} className="relative inline-block text-left pt-2">
-      <div>
-        <button
-          type="button"
-          onClick={handleToggle}
-          className="inline-flex  justify-center w-full rounded-md border border-baseSecondary text-baseSecondary px-4 py-2  text-sm font-primary hover:bg-baseSecondary hover:text-basePrimary focus:ring-2 focus:ring-offset-1 pt-2"
-          id="options-menu"
-          aria-haspopup="true"
-          aria-expanded={isOpen}
+    <div ref={dropdownRef} className="relative inline-block start-0 pt-2">
+      <button
+        type="button"
+        onClick={onDropdownToggle}
+        className="inline-flex w-full rounded-md border border-baseSecondary text-baseSecondary px-4 py-2 text-sm font-primary hover:bg-baseSecondary hover:text-basePrimary focus:ring-2 focus:ring-offset-1 pt-2"
+        aria-haspopup="true"
+        aria-expanded={isActive}
+      >
+        {getDisplayText()}
+        <svg
+          className="-mr-1 ml-2 h-5 w-5"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          aria-hidden="true"
         >
-          {multipleSelect ? placeholder : selectedOption || placeholder}
-          <svg
-            className="-mr-1 ml-2 h-5 w-5"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            aria-hidden="true"
-          >
-            <path
-              fillRule="evenodd"
-              d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-      </div>
+          <path
+            fillRule="evenodd"
+            d={
+              horizontal
+                ? "M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                : `M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z`
+            }
+            clipRule="evenodd"
+          />
+        </svg>
+      </button>
 
-      {isOpen && (
+      {isActive && (
         <div
-          className="origin-top-right absolute z-50 bg-basePrimary mt-2 w-56 rounded-md shadow-lg ring-1 ring-baseSecondary ring-opacity-5"
+          className={`origin-top-right absolute z-50 bg-basePrimary mt-2 w-56 rounded-md shadow-lg ring-1 ring-baseSecondary ring-opacity-5 ${horizontal && "top-0 left-[110%]"}`}
           role="menu"
           aria-orientation="vertical"
           aria-labelledby="options-menu"
         >
           <div className="py-1" role="none">
-            {dropDownOptions?.map((option, index) => (
-              <button
-                key={index}
-                onClick={() => handleSelect(option.option, option.selected)}
-                className={`flex flex-row items-center font-primary ${option.selected ? "bg-baseSecondary" : ""} ${option.selected ? "text-basePrimary" : "text-baseSecondary"} hover:bg-baseSecondary w-full text-left px-4 py-2 text-sm hover:text-basePrimary`}
-                role="menuitem"
-                type="button"
-              >
-                {option.selected ? <CheckIcon /> : null}
-                {option.option}
-              </button>
-            ))}
+            {options.map((option, index) => {
+              const isSelected = internalSelectedOptions.includes(option);
+              return (
+                <button
+                  key={index}
+                  onClick={() => handleSelect(option)}
+                  className={`flex flex-row items-center font-primary ${
+                    isSelected
+                      ? "bg-baseSecondary text-basePrimary"
+                      : "text-baseSecondary"
+                  } hover:bg-baseSecondary w-full text-left px-4 py-2 text-sm hover:text-basePrimary`}
+                  role="menuitem"
+                  type="button"
+                >
+                  {isSelected && <CheckIcon />}
+                  {option}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
