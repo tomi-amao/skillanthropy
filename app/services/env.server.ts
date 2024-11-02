@@ -8,3 +8,10 @@ export function getZitadelVars() {
     MACHINE_API_KEY: process.env.MACHINE_API_KEY ?? "",
   };
 }
+export function getElasticVars() {
+  return {
+    ELASTIC_PASSWORD: process.env.ELASTIC_PASSWORD ?? "",
+    ELASTIC_USERNAME: process.env.ELASTIC_USERNAME ?? "",
+
+  };
+}

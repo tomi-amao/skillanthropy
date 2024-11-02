@@ -48,7 +48,7 @@ export default function TaskSummaryCard(task: taskAdditionalDetails) {
   return (
     <>
       <button
-        className="lg:w-[19rem] w-[20rem] rounded-xl shadow-md overflow-hidden  hover:shadow-2xl"
+        className="lg:w-[19rem] w-[20rem] rounded-xl shadow-md overflow-hidden  hover:shadow-xl bg-basePrimaryLight mt-2"
         onClick={() => {
           setShowModal(true);
         }}

@@ -27,6 +27,7 @@ const Dropdown: React.FC<DropdownProps> = ({
     useState<string[]>(defaultSelected);
 
   // Update internal state when defaultSelected changes
+
   useEffect(() => {
     setInternalSelectedOptions(defaultSelected);
   }, [defaultSelected]);

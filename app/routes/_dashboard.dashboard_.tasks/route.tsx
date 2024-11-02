@@ -38,7 +38,7 @@ import {
 import { useFetcher, useLoaderData, useSubmit } from "@remix-run/react";
 import { charities, tasks, TaskUrgency, users } from "@prisma/client";
 import { getUrgencyColor } from "~/components/cards/taskCard";
-import type { Prisma, taskApplications } from "@prisma/client";
+import type { Prisma, taskApplications, TaskStatus } from "@prisma/client";
 import { NewTaskFormData } from "~/models/types.server";
 import { transformUserTaskApplications } from "~/components/utils/DataTransformation";
 import { UploadFilesComponent } from "~/components/utils/FileUpload";
@@ -97,6 +97,11 @@ export default function TaskList() {
   const [showMessageSection, setShowMessageSection] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [editTask, setEditTask] = useState(false);
+  const [activeDropDowns, setActiveDropdowns] = useState({
+    status: false,
+    urgency: false,
+  });
+  const [taskStatus, setTaskStatus] = useState<TaskStatus>();
   const submit = useSubmit();
   const fetcher = useFetcher();
   const [formData, setFormData] = useState<NewTaskFormData>({
@@ -179,7 +184,14 @@ export default function TaskList() {
     // optimistically update the UI
     const updatedTasks = tasks?.map((task) =>
       task?.id === taskId
-        ? { ...task, ...{ ...updateTaskData, ["resources"]: trimmedResources } } // transform resources property to match schema
+        ? {
+            ...task,
+            ...{
+              ...updateTaskData,
+              ["resources"]: trimmedResources,
+              status: option as TaskStatus,
+            },
+          } // transform resources property to match schema
         : task,
     );
     setTasks(updatedTasks as typeof initialTasks);
@@ -187,16 +199,19 @@ export default function TaskList() {
     if (selectedTask?.id === taskId) {
       setSelectedTask({
         ...selectedTask,
-        ...{ ...(updateTaskData as tasks), ["resources"]: trimmedResources },
+        ...{
+          ...(updateTaskData as tasks),
+          ["resources"]: trimmedResources,
+          status: option as TaskStatus,
+        },
       });
     }
 
-    const jsonUpdateTaskData = option
-      ? JSON.stringify({ status: option, deadline: selectedTask?.deadline })
-      : JSON.stringify({
-          ...updateTaskData,
-          ["resources"]: trimmedResources,
-        });
+    const jsonUpdateTaskData = JSON.stringify({
+      ...updateTaskData,
+      ["resources"]: trimmedResources,
+      status: option as TaskStatus,
+    });
 
     submit(
       { taskId, updateTaskData: jsonUpdateTaskData, _action: "updateTask" },
@@ -207,6 +222,13 @@ export default function TaskList() {
       setEditTask(false);
     }
   };
+
+  useEffect(() => {
+    setTaskStatus(selectedTask?.status as TaskStatus);
+    console.log("Task Status", taskStatus);
+    console.log("Task Cate", selectedTask?.category);
+    console.log(selectedTask);
+  }, [formData, fetcher.data, selectedTask]);
 
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data?.error) {
@@ -321,6 +343,12 @@ export default function TaskList() {
     setSelectedTask(null);
   };
 
+  const handleActiveDropdowns = (dropdown: string) => {
+    setActiveDropdowns((preValue) => {
+      return { ...preValue, [dropdown]: !preValue[dropdown] };
+    });
+  };
+
   return (
     <div className="flex flex-col lg:flex-row w-full lg:min-h-screen p-4 -mt-8">
       <div className="lg:w-1/3 w-full p-4 shadow-md space-y-4 rounded-md border border-basePrimaryDark">
@@ -342,13 +370,15 @@ export default function TaskList() {
             options={taskCharityCategories}
             placeholder="Filter"
             onSelect={onSelect}
-            multipleSelect={true}
+            multipleSelect={false}
+            defaultSelected={[]}
           />
           <Dropdown
             options={taskCategoryFilterOptions}
             placeholder="Sort"
             onSelect={onSelect}
-            multipleSelect={true}
+            multipleSelect={false}
+            defaultSelected={[]}
           />
         </div>
 
@@ -574,15 +604,20 @@ export default function TaskList() {
             {editTask ? (
               <>
                 <Dropdown
-                  multipleSelect={false}
-                  placeholder={selectedTask.urgency as string}
                   options={urgencyOptions}
+                  placeholder={selectedTask.urgency as string}
                   onSelect={(option) => {
                     setFormData({
                       ...formData,
                       urgency: option as TaskUrgency,
                     });
                   }}
+                  multipleSelect={false}
+                  defaultSelected={[formData.urgency!]}
+                  onDropdownToggle={() => {
+                    handleActiveDropdowns("urgency");
+                  }}
+                  isActive={activeDropDowns?.urgency}
                 />
               </>
             ) : (
@@ -717,12 +752,17 @@ export default function TaskList() {
               </h1>
               <div className="flex gap-4 mt-2">
                 <Dropdown
-                  multipleSelect={false}
-                  placeholder={selectedTask.status as string}
                   options={statusOptions}
+                  placeholder={selectedTask.status as string}
                   onSelect={(option) => {
                     handleUpdateTaskDetails(selectedTask.id!, formData, option);
                   }}
+                  multipleSelect={false}
+                  defaultSelected={[taskStatus!]}
+                  onDropdownToggle={() => {
+                    handleActiveDropdowns("status");
+                  }}
+                  isActive={activeDropDowns?.status}
                 />
               </div>
             </div>
