@@ -1,13 +1,19 @@
-import { Form, Link } from "@remix-run/react";
+import { Form, Link, useFetcher, useLoaderData } from "@remix-run/react";
 import { SearchIcon } from "../utils/icons";
-import { useEffect, useState } from "react";
+import { ChangeEvent, useEffect, useState } from "react";
 
 export default function Navbar({
   altBackground,
   isLoggedIn,
+  // handleSearch,
+  searchValue,
 }: {
   altBackground?: boolean;
   isLoggedIn: boolean;
+  handleSearch?: (e: ChangeEvent<HTMLInputElement>, property: string) => void;
+  searchValue?: {
+    query: string;
+  };
 }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showNavbar, setShowNavbar] = useState(true);
@@ -39,6 +45,32 @@ export default function Navbar({
     };
     // when scroll position changes, toggle nabvar
   }, [lastScrollPos]);
+
+  const [search, setSearch] = useState({
+    query: "",
+  });
+
+  const fetcher = useFetcher();
+
+  const handleSearch = (e: ChangeEvent<HTMLInputElement>, property: string) => {
+    // console.log(e.target.value);
+
+    // setSearch((preValue) => { return (setSearch((preValue) => {...preValue, [property]: e.va}))} )
+    setSearch((preValue) => {
+      return { ...preValue, [property]: e.target.value };
+    });
+  };
+  // const rawSearchedDocuments = searchedDocuments.map(
+  //   (document) => document._source,
+  // );
+
+  // console.log("Result query",rawSearchedDocuments);
+
+  useEffect(() => {
+    console.log(search);
+    fetcher.load(`/multisearch?search=${search.query}`);
+  }, [search]);
+
   return (
     <>
       <div
@@ -64,11 +96,26 @@ export default function Navbar({
                   type="text"
                   placeholder="Search "
                   className="w-full flex-grow bg-basePrimaryDark  text-sm lg:text-base"
+                  onChange={(e) => {
+                    handleSearch(e, "query");
+                  }}
+                  value={search.query}
                 />
               </div>
-              {/* <div className="h-fit w-fit rounded-md px-2 mr-2 bg-basePrimaryLight text-baseSecondary text-[12px] lg:text-[13px]">
-                /
-              </div> */}
+
+            </div>
+            <div className="z-10 mt-2 absolute w-96 bg-basePrimaryDark rounded px-2 -ml-2">
+              <div className=" flex flex-col ">
+                {/* {fetcher.data?.rawSearchedDocuments.map((document)  => )})} */}
+                {/* {rawSearchedDocuments.map(document => <div> {document.impact} </div>)} */}
+
+                {search.query && fetcher.data?.rawSearchedDocuments.map((document) => (
+                  <>
+                    <h1> {document.collection} </h1>
+                    <div>{document.data.title || document.data.name}</div>
+                  </>
+                ))}
+              </div>
             </div>
           </Form>
           <button
