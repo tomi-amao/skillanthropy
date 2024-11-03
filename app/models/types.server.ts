@@ -1,4 +1,4 @@
-import type { TaskUrgency } from "@prisma/client";
+import type { charities, tasks, TaskUrgency, users } from "@prisma/client";
 import { TaskResource } from "~/types/tasks";
 
 export interface newusersForm {
@@ -21,4 +21,11 @@ export interface NewTaskFormData {
   volunteersNeeded: number | undefined;
   urgency: TaskUrgency;
   deliverables: string[];
+}
+
+export type CombinedCollections = users & charities & tasks;
+
+export interface MultiSearchDocuments {
+  collection: string;
+  data: CombinedCollections;
 }

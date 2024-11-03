@@ -1,12 +1,11 @@
-import { Form, Link, useFetcher, useLoaderData } from "@remix-run/react";
+import { Form, Link, useFetcher } from "@remix-run/react";
 import { SearchIcon } from "../utils/icons";
 import { ChangeEvent, useEffect, useState } from "react";
+import { SearchDropdown } from "../utils/selectDropdown";
 
 export default function Navbar({
   altBackground,
   isLoggedIn,
-  // handleSearch,
-  searchValue,
 }: {
   altBackground?: boolean;
   isLoggedIn: boolean;
@@ -102,19 +101,23 @@ export default function Navbar({
                   value={search.query}
                 />
               </div>
-
             </div>
-            <div className="z-10 mt-2 absolute w-96 bg-basePrimaryDark rounded px-2 -ml-2">
+            <div className="z-10 mt-2 absolute w-96 bg-basePrimaryDark rounded -ml-2">
               <div className=" flex flex-col ">
                 {/* {fetcher.data?.rawSearchedDocuments.map((document)  => )})} */}
                 {/* {rawSearchedDocuments.map(document => <div> {document.impact} </div>)} */}
 
-                {search.query && fetcher.data?.rawSearchedDocuments.map((document) => (
+                {/* {search.query && fetcher.data?.rawSearchedDocuments.map((document) => (
                   <>
                     <h1> {document.collection} </h1>
                     <div>{document.data.title || document.data.name}</div>
                   </>
-                ))}
+                ))} */}
+                {search.query && (
+                  <SearchDropdown
+                    searchResults={fetcher.data?.rawSearchedDocuments}
+                  />
+                )}
               </div>
             </div>
           </Form>

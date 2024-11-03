@@ -12,6 +12,5 @@ export function getElasticVars() {
   return {
     ELASTIC_PASSWORD: process.env.ELASTIC_PASSWORD ?? "",
     ELASTIC_USERNAME: process.env.ELASTIC_USERNAME ?? "",
-
   };
 }

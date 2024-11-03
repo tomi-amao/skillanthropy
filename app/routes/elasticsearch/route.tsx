@@ -1,6 +1,6 @@
 import { Client } from "@elastic/elasticsearch";
 
-const elastic = getElasticVars()
+const elastic = getElasticVars();
 const client = new Client({
   node: "http://localhost:9200/",
   auth: {
@@ -19,8 +19,8 @@ export async function loader({ params }: LoaderFunctionArgs) {
   // API Key should have cluster monitor rights.
   const resp = await client.info();
   console.log(params);
-  
-    console.log(resp);
+
+  console.log(resp);
 
   // Let's search!
   const searchResult = await client.search({

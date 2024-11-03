@@ -1,5 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
-import { CheckIcon } from "./icons";
+import {
+  AccountCircleIcon,
+  CheckIcon,
+  CompanyIcon,
+  DescriptionIcon,
+} from "./icons";
+import { MultiSearchDocuments } from "~/models/types.server";
 
 interface DropdownProps {
   options: string[];
@@ -97,7 +103,7 @@ const Dropdown: React.FC<DropdownProps> = ({
       >
         {getDisplayText()}
         <svg
-          className="-mr-1 ml-2 h-5 w-5"
+          className="-mr-1  h-5 w-5"
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 20 20"
           fill="currentColor"
@@ -150,3 +156,63 @@ const Dropdown: React.FC<DropdownProps> = ({
 };
 
 export default Dropdown;
+
+export const SearchDropdown = ({
+  searchResults,
+}: {
+  searchResults: MultiSearchDocuments[];
+}) => {
+  const renderSearchResult = (searchResults: MultiSearchDocuments) => {
+    switch (searchResults.collection) {
+      case "skillanthropy-charities":
+        return (
+          <button className="flex text-left items-center m-auto  rounded-md space-x-2 hover:bg-basePrimaryLight w-full p-2 ">
+            <span>
+              <CompanyIcon />
+            </span>
+            <div>
+              <p> {searchResults.data.name} </p>
+              <p className="text-xs">{searchResults.data.description}</p>
+            </div>
+          </button>
+        );
+      case "skillanthropy-tasks":
+        return (
+          <button className="flex  text-left items-center m-auto  rounded-md space-x-2 hover:bg-basePrimaryLight w-full p-2 ">
+            <span>
+              <DescriptionIcon />
+            </span>
+            <div>
+              <p> {searchResults.data.title} </p>
+              <p className="text-xs"> {searchResults.data.description}</p>
+            </div>
+          </button>
+        );
+      case "skillanthropy_users":
+        return (
+          <button className="flex text-left items-center m-auto  rounded-md space-x-2 hover:bg-basePrimaryLight w-full p-2 ">
+            <span>
+              <AccountCircleIcon />
+            </span>
+            <div>
+              <p> {searchResults.data.name} </p>
+              <p className="text-xs"> {searchResults.data.bio} </p>
+            </div>
+          </button>
+        );
+      default:
+        <div>No search results found</div>;
+    }
+  };
+  return (
+    <>
+      {searchResults.length > 0 ? (
+        searchResults.map((result) =>
+          renderSearchResult(result as unknown as MultiSearchDocuments),
+        )
+      ) : (
+        <div> No results</div>
+      )}
+    </>
+  );
+};
