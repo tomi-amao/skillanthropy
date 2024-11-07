@@ -164,6 +164,17 @@ services:
     command: /app/bin/elastic-ingest -c /config
     # network_mode: "elastic"
 
+  mongodb-es-sync-service:
+    image: theignorantview/mongodb-es-sync-service:latest
+    container_name: mongodb_es_sync_service  
+    ports:
+      - "5000:5000"  
+    env_file:
+      - .env  
+    # restart: unless-stopped  
+    networks:
+      - elastic 
+
 networks:
   zitadel:
   elastic:
