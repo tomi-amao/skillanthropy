@@ -52,18 +52,10 @@ export default function Navbar({
   const fetcher = useFetcher();
 
   const handleSearch = (e: ChangeEvent<HTMLInputElement>, property: string) => {
-    // console.log(e.target.value);
-
-    // setSearch((preValue) => { return (setSearch((preValue) => {...preValue, [property]: e.va}))} )
     setSearch((preValue) => {
       return { ...preValue, [property]: e.target.value };
     });
   };
-  // const rawSearchedDocuments = searchedDocuments.map(
-  //   (document) => document._source,
-  // );
-
-  // console.log("Result query",rawSearchedDocuments);
 
   useEffect(() => {
     console.log(search);

@@ -154,26 +154,21 @@ services:
       ELASTICSEARCH_PASSWORD: ${ELASTIC_PASSWORD}
       XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY: c69548d9027afcf4d55146b1d425a9f4c69548d9027afcf4d55146b1d425a9f4
 
-  elastic-connectors:
-    image: docker.elastic.co/integrations/elastic-connectors:${CONNECTORS_VERSION}
-    depends_on:
-      - elasticsearch
-      - kibana
-    volumes:
-      - /connectors-config:/config
-    command: /app/bin/elastic-ingest -c /config
-    # network_mode: "elastic"
 
-  mongodb-es-sync-service:
+  mongodb_es_sync_service:
     image: theignorantview/mongodb-es-sync-service:latest
+    # depends_on:
+    #   - elasticsearch
+    #   - kibana
     container_name: mongodb_es_sync_service  
-    ports:
-      - "5000:5000"  
     env_file:
       - .env  
     # restart: unless-stopped  
     networks:
       - elastic 
+
+  
+
 
 networks:
   zitadel:

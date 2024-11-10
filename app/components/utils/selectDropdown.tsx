@@ -164,7 +164,7 @@ export const SearchDropdown = ({
 }) => {
   const renderSearchResult = (searchResults: MultiSearchDocuments) => {
     switch (searchResults.collection) {
-      case "skillanthropy-charities":
+      case "skillanthropy_charities":
         return (
           <button className="flex text-left items-center m-auto  rounded-md space-x-2 hover:bg-basePrimaryLight w-full p-2 ">
             <span>
@@ -176,7 +176,7 @@ export const SearchDropdown = ({
             </div>
           </button>
         );
-      case "skillanthropy-tasks":
+      case "skillanthropy_tasks":
         return (
           <button className="flex  text-left items-center m-auto  rounded-md space-x-2 hover:bg-basePrimaryLight w-full p-2 ">
             <span>

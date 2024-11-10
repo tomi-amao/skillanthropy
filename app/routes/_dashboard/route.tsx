@@ -61,9 +61,9 @@ export default function Dashboard() {
 
   return (
     <>
-      <div className=" h-full lg:h-screen flex flex-row  ">
+      <div className=" h-full lg:h-screen flex flex-row   ">
         <Navbar isLoggedIn={userInfo.id ? true : false} />
-        <div className=" flex w-3/12 lg:max-w-48 space-y-4 mt-[3.8rem] lg:mt-[4rem] p-4  border-r-[1px] border-baseSecondary min-h-full">
+        <div className=" flex w-3/12 lg:max-w-48 space-y-4 mt-[3.8rem] lg:mt-[4rem] p-4   min-h-full  lg:fixed ">
           <div>
             <ProfileCard
               name={userInfo?.name}
@@ -85,7 +85,7 @@ export default function Dashboard() {
             </nav>
           </div>
         </div>
-        <div className="w-full  mt-20">
+        <div className="w-full  mt-20 lg:ml-48">
           <Outlet></Outlet>
         </div>
       </div>

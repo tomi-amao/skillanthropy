@@ -2,7 +2,7 @@ import { TaskStatus, TaskUrgency } from "@prisma/client";
 import { LoaderFunctionArgs } from "@remix-run/node";
 import { prisma } from "~/services/db.server";
 
-type SortOrder = "asc" | "desc";
+export type SortOrder = "asc" | "desc";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
@@ -51,7 +51,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       ...(getOrderDirection(updatedAt)
         ? [{ updatedAt: getOrderDirection(updatedAt) }]
         : []),
-      { createdAt: "desc" }, // Default fallback order
+      { createdAt: "desc" }, 
     ],
   });
   console.log(filteredTasks);

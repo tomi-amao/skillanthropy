@@ -24,3 +24,13 @@ ELASTIC_PASSWORD=
 KIBANA_VERSION=
 CONNECTORS_VERSION=
 ELASTIC_USERNAME=
+
+
+To access Kibana, run the following:
+ELASTICSEARCH_URL="http://localhost:9200"
+ELASTIC_PASSWORD=your_password
+change_data="{ \"password\": \"${ELASTIC_PASSWORD}\" }"
+curl -u elastic:$ELASTIC_PASSWORD "$@" -X POST "${ELASTICSEARCH_URL}/_security/user/kibana_system/_password?pretty" -H 'Content-Type: application/json' -d"${change_data}"
+
+To ingest existing data, run a connector service:
+podman run -v ./config/mongodb_es_sync/charities-connectors-config:/config --network skillanthropy_elastic --tty --rm docker.elastic.co/enterprise-search/elastic-connectors:8.15.0.0 /app/bin/elastic-ingest -c /config

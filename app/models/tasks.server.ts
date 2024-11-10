@@ -1,6 +1,7 @@
 import { tasks } from "@prisma/client";
 import { prisma } from "~/services/db.server";
 import type { Prisma } from "@prisma/client";
+import { SortOrder } from "~/routes/search/route";
 
 export const createTask = async (
   taskData: Partial<tasks>,
@@ -73,7 +74,21 @@ export const getAllTasks = async () => {
   }
 };
 
-export const getUserTasks = async (userId: string) => {
+export const getUserTasks = async (
+  userId: string,
+  deadline?: SortOrder,
+  createdAt?: SortOrder,
+  updatedAt?: SortOrder,
+) => {
+  const getOrderDirection = (value: string): SortOrder | undefined => {
+    return value === "asc" || value === "desc"
+      ? (value as SortOrder)
+      : undefined;
+  };
+
+  console.log("server created", createdAt );
+  console.log("server updated",  updatedAt);
+  
   try {
     const tasks = await prisma.taskApplications.findMany({
       where: { userId },
@@ -81,6 +96,18 @@ export const getUserTasks = async (userId: string) => {
         task: { include: { createdBy: true, taskApplications: true } },
         charity: true,
       },
+      orderBy: [
+        ...(getOrderDirection(deadline!)
+          ? [{ task: { deadline: getOrderDirection(deadline || "desc") } }]
+          : []),
+        ...(getOrderDirection(updatedAt!)
+          ? [{ task: { updatedAt: getOrderDirection(updatedAt || "desc") } }]
+          : []),
+        ...(getOrderDirection(createdAt!)
+          ? [{ task: { createdAt: getOrderDirection(createdAt || "desc") } }]
+          : []),
+        { createdAt: "desc" },
+      ],
     });
 
     return {

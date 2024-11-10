@@ -1,7 +1,6 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
 import { getElasticVars } from "~/services/env.server";
 import { Client } from "@elastic/elasticsearch";
-import Navbar from "~/components/navigation/Header2";
 
 // Initialize Elasticsearch client
 const elastic = getElasticVars();
@@ -19,34 +18,42 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // console.log(query);
 
   // Multi-index search
-  const searchResult = await client.search({
-    index: "skillanthropy-tasks,skillanthropy_users,skillanthropy-charities", // Specify multiple indices here
-    body: {
-      query: {
-        multi_match: {
-          query: query,
-          fields: ["*", "*", "*"], // Specify fields based on each index
+  if (await client.ping()) {
+    try {
+      const searchResult = await client.search({
+        index:
+          "skillanthropy_tasks,skillanthropy_users,skillanthropy_charities", // specify multiple indices
+        body: {
+          query: {
+            multi_match: {
+              query: query,
+              fields: ["*", "*", "*"], // specify fields based on each index
+            },
+          },
         },
-      },
-    },
-  });
+      });
+      const searchedDocuments = searchResult.hits.hits;
+      // console.log("Search hits",searchResult.hits);
+      const rawSearchedDocuments = searchedDocuments
+        .map((document) => {
+          return { collection: document._index, data: document._source };
+        })
+        .filter(Boolean);
+      // console.log("Documents", rawSearchedDocuments);
 
+      return { searchResult, searchedDocuments, rawSearchedDocuments };
+    } catch (error) {
+      console.log("Could not connect to elastic client");
+      return {message: "Could not connect to elastic client", status: 400 }
+      
+    }
+  } 
+  return null
   // console.log(searchResult.hits.hits);
 
   // searchResult.hits.hits.map((result) => {
   //   console.log(result._source);
   // });
-
-  const searchedDocuments = searchResult.hits.hits;
-  // console.log("Search hits",searchResult.hits);
-  const rawSearchedDocuments = searchedDocuments
-    .map((document) => {
-      return { collection: document._index, data: document._source };
-    })
-    .filter(Boolean);
-  // console.log("Documents", rawSearchedDocuments);
-
-  return { searchResult, searchedDocuments, rawSearchedDocuments };
 }
 
 export default function MultiSearch() {
@@ -73,7 +80,7 @@ export default function MultiSearch() {
   // }, [search]);
   return (
     <>
-      <Navbar isLoggedIn={false} searchValue={search} />
+      {/* <Navbar isLoggedIn={false} searchValue={search} /> */}
       <div className="pt-20 flex flex-col ">{/* <SearchDropdown /> */}</div>
     </>
   );

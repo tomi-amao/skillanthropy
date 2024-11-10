@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, ChangeEvent } from "react";
 import {
+  CancelButton,
   PrimaryButton,
   SecondaryButton,
+  SecondaryButtonAlt,
 } from "../../components/utils/BasicButton";
 
 import Dropdown from "~/components/utils/selectDropdown";
@@ -42,10 +44,13 @@ import type { Prisma, taskApplications, TaskStatus } from "@prisma/client";
 import { NewTaskFormData } from "~/models/types.server";
 import { transformUserTaskApplications } from "~/components/utils/DataTransformation";
 import { UploadFilesComponent } from "~/components/utils/FileUpload";
-import { AddIcon } from "~/components/utils/icons";
+import { AddIcon, CloseIcon, SortIcon } from "~/components/utils/icons";
 import { Modal } from "~/components/utils/Modal2";
 import { Meta, UppyFile } from "@uppy/core";
 import DashboardBanner from "~/components/cards/BannerSummaryCard";
+import { SortOrder } from "../search/route";
+import { DropdownCard } from "~/components/cards/FilterCard";
+import { searchUserTaskApplications } from "~/services/search.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getSession(request);
@@ -60,7 +65,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const { id: userId, roles: userRole, charityId } = userInfo;
 
-  console.log("user id", userId, "charity id", charityId);
+  const url = new URL(request.url);
+  const deadline = url.searchParams.get("deadline");
+  const createdAt = url.searchParams.get("createdAt");
+  const updatedAt = url.searchParams.get("updatedAt");
+  const search = url.searchParams.get("search");
+
+  // console.log("user id", userId, "charity id", charityId);
   if (userRole.includes("charity")) {
     const { tasks, error, message, status } = await getCharityTasks(
       charityId || "",
@@ -68,13 +79,32 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     return { tasks, error, userRole, userId, message, status };
   } else if (userRole.includes("techie")) {
-    const { tasks: rawTasks, error } = await getUserTasks(userId);
 
-    console.log(rawTasks?.map((taskApplication) => taskApplication.id));
+    const { tasks: rawTasks, error } = await getUserTasks(
+      userId,
+      deadline as SortOrder,
+      createdAt as SortOrder,
+      updatedAt as SortOrder,
+    );
+    if (search) {
+      // retrieve the taskIds from the taskApplications associated to the user
+      const taskIds = rawTasks?.map(task => task.taskId) || []
+      console.log(taskIds);
+      
+      const tasks = await searchUserTaskApplications(search, taskIds) 
+      console.log(tasks?.rawSearchedDocuments);
+      
+      return {tasks, error, userRole, userId}
+      // return await searchUserTaskApplications(search, userId);
+    }
 
     const tasks = transformUserTaskApplications(rawTasks);
 
     return { tasks, error, userRole, userId };
+  } else {
+    console.log("No user role defined, finish sign up.");
+
+    return redirect("/newuser");
   }
 }
 
@@ -85,6 +115,9 @@ export default function TaskList() {
     userRole,
     userId,
   } = useLoaderData<typeof loader>();
+  const fetcher = useFetcher();
+  const fetchTaskApplications = useFetcher();
+
   const [tasks, setTasks] = useState(initialTasks);
   const [selectedTask, setSelectedTask] = useState<Partial<tasks> | null>();
   const [selectedCharity, setSelectedCharity] =
@@ -103,7 +136,6 @@ export default function TaskList() {
   });
   const [taskStatus, setTaskStatus] = useState<TaskStatus>();
   const submit = useSubmit();
-  const fetcher = useFetcher();
   const [formData, setFormData] = useState<NewTaskFormData>({
     title: selectedTask?.title || "",
     description: selectedTask?.description || "",
@@ -140,10 +172,10 @@ export default function TaskList() {
     setSelectedCharity(charity);
     setSelectedTaskCreator(taskCreator);
     setSelectedTaskApplications(taskApplications);
-    console.log(
-      "task applications",
-      selectedTaskApplications?.map((applicant) => applicant),
-    );
+    // console.log(
+    //   "task applications",
+    //   selectedTaskApplications?.map((applicant) => applicant),
+    // );
 
     setShowTaskForm(false);
   };
@@ -225,9 +257,9 @@ export default function TaskList() {
 
   useEffect(() => {
     setTaskStatus(selectedTask?.status as TaskStatus);
-    console.log("Task Status", taskStatus);
-    console.log("Task Cate", selectedTask?.category);
-    console.log(selectedTask);
+    // console.log("Task Status", taskStatus);
+    // console.log("Task Cate", selectedTask?.category);
+    // console.log(selectedTask);
   }, [formData, fetcher.data, selectedTask]);
 
   useEffect(() => {
@@ -308,7 +340,7 @@ export default function TaskList() {
     const applicantUserIds = selectedTaskApplications?.map((applicant) => {
       return [applicant.userId];
     });
-    console.log(applicantUserIds, "Application Ids");
+    // console.log(applicantUserIds, "Application Ids");
 
     fetcher.submit(
       {
@@ -349,6 +381,156 @@ export default function TaskList() {
     });
   };
 
+  const sortList = ["deadline", "createdAt", "updatedAt"];
+  const [filterSort, setFilterSort] = useState({
+    skills: [],
+    charity: [],
+    urgency: [],
+    status: [],
+    deadline: [],
+    createdAt: [],
+    updatedAt: [],
+  });
+  // function to handle option selection
+  const onSortSelect = (option: string, selected: boolean, filter: string) => {
+    if (sortList.includes(filter)) {
+      setFilterSort((preValue) => {
+        return {
+          ...preValue,
+          ["deadline"]: [],
+          ["updatedAt"]: [],
+          ["createdAt"]: [],
+        };
+      });
+    }
+
+    setFilterSort((prevFilters) => {
+      const currentOptions = prevFilters[filter];
+
+      // check if the option is already selected
+      const isSelected = currentOptions.includes(option);
+
+      // update the array by either adding or removing the selected option
+      if (filter == "charity" || filter == "skills") {
+        const updatedOptions = isSelected
+          ? currentOptions.filter((item: string) => item !== option) // remove if selected
+          : [...currentOptions, option]; // add if not selected
+
+        return {
+          ...prevFilters,
+          [filter]: updatedOptions, // update the specific filter type
+        };
+      } else {
+        console.log(option, "is selected", selected);
+
+        const updatedOptions = selected ? option : "";
+        return { ...prevFilters, [filter]: [updatedOptions] };
+      }
+    });
+  };
+
+  const sortOptionsToggle = (handleToggle: () => void) => {
+    return (
+      <SecondaryButtonAlt
+        ariaLabel="sort button"
+        text="Sort"
+        icon={<SortIcon />}
+        action={handleToggle}
+      />
+    );
+  };
+
+  const clearFilters = () => {
+    setFilterSort({
+      skills: [],
+      charity: [],
+      urgency: [],
+      status: [],
+      deadline: [],
+      createdAt: [],
+      updatedAt: [],
+    });
+  };
+  const sortOptions = [
+    <Dropdown
+      key="createdAt"
+      options={["asc", "desc"]}
+      placeholder="Created At"
+      onSelect={(option, selected) =>
+        onSortSelect(option, selected, "createdAt")
+      }
+      multipleSelect={false}
+      horizontal={true}
+      defaultSelected={filterSort.createdAt}
+    />,
+    <Dropdown
+      key="deadline"
+      options={["asc", "desc"]}
+      placeholder="Deadline"
+      onSelect={(option, selected) =>
+        onSortSelect(option, selected, "deadline")
+      }
+      multipleSelect={false}
+      horizontal={true}
+      defaultSelected={filterSort.deadline}
+    />,
+    <Dropdown
+      key="updatedAt"
+      options={["asc", "desc"]}
+      placeholder="Updated At"
+      onSelect={(option, selected) =>
+        onSortSelect(option, selected, "updatedAt")
+      }
+      multipleSelect={false}
+      horizontal={true}
+      defaultSelected={filterSort.updatedAt}
+    />,
+  ];
+
+  useEffect(() => {
+    const baseURL = "/dashboard/tasks";
+
+    const url = new URL(baseURL, window.location.origin);
+
+    Object.entries(filterSort).forEach(([key, values]) => {
+      if (values.length) {
+        url.searchParams.append(key, values.join(","));
+      }
+    });
+
+    fetchTaskApplications.load(`${url.pathname}${url.search}`);
+
+    console.log("Sort method", filterSort.deadline);
+  }, [filterSort]);
+
+  const [search, setSearch] = useState({
+    query: "",
+  });
+
+  const handleSearch = (e: ChangeEvent<HTMLInputElement>, property: string) => {
+    setSearch((preValue) => {
+      return { ...preValue, [property]: e.target.value };
+    });
+  };
+
+  const fetchSearchedApplications = useFetcher()
+  useEffect(() => {
+    console.log(search);
+    const baseURL = "/dashboard/tasks";
+
+    const url = new URL(baseURL, window.location.origin);
+    url.searchParams.append("search", search.query);
+    fetchSearchedApplications.load(`${url.pathname}${url.search}`);
+    const searchedUserTasks = fetchSearchedApplications.data?.tasks.rawSearchedDocuments
+    if (searchedUserTasks) {
+      searchedUserTasks.map(task => {console.log(task.data)})
+      
+    }
+    
+  }, [search]);
+
+  const tasksToDisplay = fetchSearchedApplications.data?.tasks.rawSearchedDocuments || fetchTaskApplications.data?.tasks || initialTasks;
+
   return (
     <div className="flex flex-col lg:flex-row w-full lg:min-h-screen p-4 -mt-8">
       <div className="lg:w-1/3 w-full p-4 shadow-md space-y-4 rounded-md border border-basePrimaryDark">
@@ -363,47 +545,76 @@ export default function TaskList() {
         <input
           type="text"
           placeholder="Search "
-          className="w-full flex-grow p-2 bg-basePrimaryDark text-sm lg:text-base rounded"
+          className="w-full flex-grow p-2 bg-basePrimaryDark text-sm lg:text-base rounded font-primary text-baseSecondary"
+          onChange={(e) => {
+            handleSearch(e, "query");
+          }}
+          value={search.query}
         />
         <div className="flex mb-4 gap-4">
-          <Dropdown
-            options={taskCharityCategories}
-            placeholder="Filter"
-            onSelect={onSelect}
-            multipleSelect={false}
-            defaultSelected={[]}
-          />
-          <Dropdown
-            options={taskCategoryFilterOptions}
-            placeholder="Sort"
-            onSelect={onSelect}
-            multipleSelect={false}
-            defaultSelected={[]}
-          />
+          <div className="mt-2 flex items-center space-x-2">
+            <DropdownCard
+              dropdownList={sortOptions}
+              dropdownToggle={sortOptionsToggle}
+            />
+            {/* {showClearFilters && (
+              <CancelButton
+                text="Clear Filters"
+                ariaLabel="clear filters"
+                icon={<CloseIcon />}
+                action={clearFilters}
+              />
+            )} */}
+          </div>
         </div>
 
         <ul className=" lg:space-y-0 text-baseSecondary">
-          {tasks?.map((task) => (
-            <button
-              key={task?.id}
-              className={`  text-left block w-full p-4 lg:p-2 border-b-[1px] hover:bg-baseSecondary hover:text-basePrimary rounded cursor-pointer lg:border-dashed ${
-                selectedTask?.id?.toString() === task?.id
-                  ? "bg-baseSecondary text-basePrimaryDark font-semibold"
-                  : ""
-              }`}
-              onClick={() =>
-                handleShowSelectedTask(
-                  task as unknown as Partial<tasks>,
-                  task?.charity as unknown as Partial<charities>,
-                  task?.createdBy as unknown as Partial<users>,
-                  task?.taskApplications as unknown as Partial<taskApplications>[],
-                )
-              }
+          {fetchTaskApplications.state === "loading" ? (
+            <svg
+              className="animate-spin h-5 w-5 mr-3 text-baseSecondary "
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
             >
-              <div className="text-lg font-primary ">{task?.title}</div>
-              <div className="text-sm">{`Due: ${new Date(task?.deadline ? task?.deadline : "").toLocaleDateString()}`}</div>
-            </button>
-          ))}
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="#836953"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="#836953"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              ></path>
+            </svg>
+          ) : (
+            <>
+              {tasksToDisplay?.map((task) => (
+                <button
+                  key={task?.id}
+                  className={`  text-left block w-full p-4 lg:p-2 border-b-[1px] hover:bg-baseSecondary hover:text-basePrimary rounded cursor-pointer lg:border-dashed ${
+                    selectedTask?.id?.toString() === task?.id
+                      ? "bg-baseSecondary text-basePrimaryDark font-semibold"
+                      : ""
+                  }`}
+                  onClick={() =>
+                    handleShowSelectedTask(
+                      task as unknown as Partial<tasks>,
+                      task?.charity as unknown as Partial<charities>,
+                      task?.createdBy as unknown as Partial<users>,
+                      task?.taskApplications as unknown as Partial<taskApplications>[],
+                    )
+                  }
+                >
+                  <div className="text-lg font-primary ">{task?.title}</div>
+                  <div className="text-sm">{`Due: ${new Date(task?.deadline ? task?.deadline : "").toLocaleDateString()}`}</div>
+                </button>
+              ))}
+            </>
+          )}
         </ul>
       </div>
       {showTaskForm && (
@@ -513,7 +724,7 @@ export default function TaskList() {
                         ...formData,
                         category: inputs,
                       });
-                      console.log(formData.category);
+                      // console.log(formData.category);
                     }}
                     placeholder="Enter the charitable category of the task"
                     availableOptions={charityTags}
@@ -582,7 +793,7 @@ export default function TaskList() {
                         ...formData,
                         deliverables: inputs,
                       });
-                      console.log(formData.deliverables);
+                      // console.log(formData.deliverables);
                     }}
                     placeholder="Add a key deliverable that will reach the outcome of the task"
                     allowCustomOptions={true}
@@ -644,7 +855,7 @@ export default function TaskList() {
                         ...formData,
                         requiredSkills: inputs,
                       });
-                      console.log(formData.requiredSkills);
+                      // console.log(formData.requiredSkills);
                     }}
                     placeholder="Add a skill relevant to completing the project"
                     availableOptions={techSkills}
