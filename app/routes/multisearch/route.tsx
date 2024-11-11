@@ -43,12 +43,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
       return { searchResult, searchedDocuments, rawSearchedDocuments };
     } catch (error) {
-      console.log("Could not connect to elastic client");
-      return {message: "Could not connect to elastic client", status: 400 }
-      
+      console.log("Could not connect to elastic client", error);
+      return { message: "Could not connect to elastic client", status: 400 };
     }
-  } 
-  return null
+  }
+  return null;
   // console.log(searchResult.hits.hits);
 
   // searchResult.hits.hits.map((result) => {

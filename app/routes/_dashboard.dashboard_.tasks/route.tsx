@@ -1,6 +1,5 @@
 import { useState, useEffect, ChangeEvent } from "react";
 import {
-  CancelButton,
   PrimaryButton,
   SecondaryButton,
   SecondaryButtonAlt,
@@ -9,8 +8,6 @@ import {
 import Dropdown from "~/components/utils/selectDropdown";
 import {
   statusOptions,
-  taskCategoryFilterOptions,
-  taskCharityCategories,
   charityTags,
   urgencyOptions,
   techSkills,
@@ -33,7 +30,6 @@ import { getUserInfo, listUsers } from "~/models/user2.server";
 import {
   deleteTask,
   deleteUserTaskApplication,
-  getCharityTasks,
   getUserTasks,
   updateTask,
 } from "~/models/tasks.server";
@@ -42,9 +38,8 @@ import { charities, tasks, TaskUrgency, users } from "@prisma/client";
 import { getUrgencyColor } from "~/components/cards/taskCard";
 import type { Prisma, taskApplications, TaskStatus } from "@prisma/client";
 import { NewTaskFormData } from "~/models/types.server";
-import { transformUserTaskApplications } from "~/components/utils/DataTransformation";
 import { UploadFilesComponent } from "~/components/utils/FileUpload";
-import { AddIcon, CloseIcon, SortIcon } from "~/components/utils/icons";
+import { AddIcon, SortIcon } from "~/components/utils/icons";
 import { Modal } from "~/components/utils/Modal2";
 import { Meta, UppyFile } from "@uppy/core";
 import DashboardBanner from "~/components/cards/BannerSummaryCard";
@@ -71,47 +66,29 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const updatedAt = url.searchParams.get("updatedAt");
   const search = url.searchParams.get("search");
 
-  // console.log("user id", userId, "charity id", charityId);
-  if (userRole.includes("charity")) {
-    const { tasks, error, message, status } = await getCharityTasks(
-      charityId || "",
-    );
+  const { tasks, error, message, status } = await getUserTasks(
+    userRole[0],
+    userId,
+    charityId || undefined,
+    deadline as SortOrder,
+    createdAt as SortOrder,
+    updatedAt as SortOrder,
+  );
 
-    return { tasks, error, userRole, userId, message, status };
-  } else if (userRole.includes("techie")) {
-
-    const { tasks: rawTasks, error } = await getUserTasks(
-      userId,
-      deadline as SortOrder,
-      createdAt as SortOrder,
-      updatedAt as SortOrder,
-    );
-    if (search) {
-      // retrieve the taskIds from the taskApplications associated to the user
-      const taskIds = rawTasks?.map(task => task.taskId) || []
-      console.log(taskIds);
-      
-      const tasks = await searchUserTaskApplications(search, taskIds) 
-      console.log(tasks?.rawSearchedDocuments);
-      
-      return {tasks, error, userRole, userId}
-      // return await searchUserTaskApplications(search, userId);
-    }
-
-    const tasks = transformUserTaskApplications(rawTasks);
+  // retrieve the taskIds from the taskApplications associated to the user
+  const taskIds = tasks?.map((task) => task.id) || [];
+  if (search) {
+    const tasks = await searchUserTaskApplications(search, taskIds);
 
     return { tasks, error, userRole, userId };
-  } else {
-    console.log("No user role defined, finish sign up.");
-
-    return redirect("/newuser");
   }
+
+  return { tasks, error, userRole, userId, message, status };
 }
 
 export default function TaskList() {
   const {
     tasks: initialTasks,
-
     userRole,
     userId,
   } = useLoaderData<typeof loader>();
@@ -178,9 +155,6 @@ export default function TaskList() {
     // );
 
     setShowTaskForm(false);
-  };
-  const onSelect = (option: string) => {
-    console.log("Selected action", option);
   };
 
   const handleShowMessageSection = () => {
@@ -257,9 +231,6 @@ export default function TaskList() {
 
   useEffect(() => {
     setTaskStatus(selectedTask?.status as TaskStatus);
-    // console.log("Task Status", taskStatus);
-    // console.log("Task Cate", selectedTask?.category);
-    // console.log(selectedTask);
   }, [formData, fetcher.data, selectedTask]);
 
   useEffect(() => {
@@ -513,7 +484,7 @@ export default function TaskList() {
     });
   };
 
-  const fetchSearchedApplications = useFetcher()
+  const fetchSearchedApplications = useFetcher();
   useEffect(() => {
     console.log(search);
     const baseURL = "/dashboard/tasks";
@@ -521,15 +492,19 @@ export default function TaskList() {
     const url = new URL(baseURL, window.location.origin);
     url.searchParams.append("search", search.query);
     fetchSearchedApplications.load(`${url.pathname}${url.search}`);
-    const searchedUserTasks = fetchSearchedApplications.data?.tasks.rawSearchedDocuments
+    const searchedUserTasks =
+      fetchSearchedApplications.data?.tasks.rawSearchedDocuments;
     if (searchedUserTasks) {
-      searchedUserTasks.map(task => {console.log(task.data)})
-      
+      searchedUserTasks.map((task) => {
+        console.log(task.data);
+      });
     }
-    
   }, [search]);
 
-  const tasksToDisplay = fetchSearchedApplications.data?.tasks.rawSearchedDocuments || fetchTaskApplications.data?.tasks || initialTasks;
+  const tasksToDisplay =
+    fetchSearchedApplications.data?.tasks.rawSearchedDocuments ||
+    fetchTaskApplications.data?.tasks ||
+    initialTasks;
 
   return (
     <div className="flex flex-col lg:flex-row w-full lg:min-h-screen p-4 -mt-8">

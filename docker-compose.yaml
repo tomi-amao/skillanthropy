@@ -154,21 +154,17 @@ services:
       ELASTICSEARCH_PASSWORD: ${ELASTIC_PASSWORD}
       XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY: c69548d9027afcf4d55146b1d425a9f4c69548d9027afcf4d55146b1d425a9f4
 
-
   mongodb_es_sync_service:
     image: theignorantview/mongodb-es-sync-service:latest
     # depends_on:
     #   - elasticsearch
     #   - kibana
-    container_name: mongodb_es_sync_service  
+    container_name: mongodb_es_sync_service
     env_file:
-      - .env  
-    # restart: unless-stopped  
+      - .env
+    # restart: unless-stopped
     networks:
-      - elastic 
-
-  
-
+      - elastic
 
 networks:
   zitadel:

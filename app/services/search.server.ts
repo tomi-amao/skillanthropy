@@ -1,5 +1,4 @@
 import { Client } from "@elastic/elasticsearch";
-import { LoaderFunctionArgs } from "@remix-run/node";
 import { getElasticVars } from "./env.server";
 
 // Initialize Elasticsearch client
@@ -12,13 +11,13 @@ const client = new Client({
   },
 });
 
-//search tasks based on provided taskIds, which is retrieved from the user's taskapplications matching their userId
+//search tasks based on provided taskIds, which is retrieved from task applications or task associated charity id
 export const searchUserTaskApplications = async (
   query: string,
   taskIds: string[] | undefined,
 ) => {
   if (!taskIds) {
-    return {message: "No task ids provided", status: 400}
+    return { message: "No task ids provided", status: 400 };
   }
   if (await client.ping()) {
     try {
@@ -48,7 +47,7 @@ export const searchUserTaskApplications = async (
       const searchedDocuments = searchResult.hits.hits;
       const rawSearchedDocuments = searchedDocuments
         .map((document) => {
-          return document._source ;
+          return document._source;
         })
         .filter(Boolean);
       // console.log("Documents", rawSearchedDocuments);

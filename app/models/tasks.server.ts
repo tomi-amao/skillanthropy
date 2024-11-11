@@ -2,6 +2,7 @@ import { tasks } from "@prisma/client";
 import { prisma } from "~/services/db.server";
 import type { Prisma } from "@prisma/client";
 import { SortOrder } from "~/routes/search/route";
+import { transformUserTaskApplications } from "~/components/utils/DataTransformation";
 
 export const createTask = async (
   taskData: Partial<tasks>,
@@ -75,7 +76,9 @@ export const getAllTasks = async () => {
 };
 
 export const getUserTasks = async (
-  userId: string,
+  userRole: string,
+  userId?: string,
+  charityId?: string,
   deadline?: SortOrder,
   createdAt?: SortOrder,
   updatedAt?: SortOrder,
@@ -85,45 +88,89 @@ export const getUserTasks = async (
       ? (value as SortOrder)
       : undefined;
   };
+  if (userRole === "charity") {
+    try {
+      console.log("Charity ID", charityId);
 
-  console.log("server created", createdAt );
-  console.log("server updated",  updatedAt);
-  
-  try {
-    const tasks = await prisma.taskApplications.findMany({
-      where: { userId },
-      include: {
-        task: { include: { createdBy: true, taskApplications: true } },
-        charity: true,
-      },
-      orderBy: [
-        ...(getOrderDirection(deadline!)
-          ? [{ task: { deadline: getOrderDirection(deadline || "desc") } }]
-          : []),
-        ...(getOrderDirection(updatedAt!)
-          ? [{ task: { updatedAt: getOrderDirection(updatedAt || "desc") } }]
-          : []),
-        ...(getOrderDirection(createdAt!)
-          ? [{ task: { createdAt: getOrderDirection(createdAt || "desc") } }]
-          : []),
-        { createdAt: "desc" },
-      ],
-    });
+      const tasks = await prisma.tasks.findMany({
+        where: { userId: userId },
+        include: { taskApplications: true, charity: true, createdBy: true },
+        orderBy: [
+          ...(getOrderDirection(deadline!)
+            ? [{ deadline: getOrderDirection(deadline || "desc") }]
+            : []),
+          ...(getOrderDirection(updatedAt!)
+            ? [{ updatedAt: getOrderDirection(updatedAt || "desc") }]
+            : []),
+          ...(getOrderDirection(createdAt!)
+            ? [{ createdAt: getOrderDirection(createdAt || "desc") }]
+            : []),
+          { createdAt: "desc" },
+        ],
+      });
 
-    return {
-      tasks,
-      message: "Successfully Retrieved User tasks",
-      error: null,
-      status: 200,
-    };
-  } catch (error) {
-    return {
-      tasks: null,
-      message: "No user tasks found",
-      error,
-      status: 500,
-    };
+      // console.log("returned", tasks);
+
+      return {
+        tasks,
+        message: "Successfully Retrieved User tasks",
+        error: null,
+        status: 200,
+      };
+    } catch (error) {
+      return {
+        tasks: null,
+        message: "No user tasks found",
+        error,
+        status: 500,
+      };
+    }
   }
+  if (userRole === "techie") {
+    try {
+      const taskApplications = await prisma.taskApplications.findMany({
+        where: { userId },
+        include: {
+          task: { include: { createdBy: true, taskApplications: true } },
+          charity: true,
+        },
+        orderBy: [
+          ...(getOrderDirection(deadline!)
+            ? [{ task: { deadline: getOrderDirection(deadline || "desc") } }]
+            : []),
+          ...(getOrderDirection(updatedAt!)
+            ? [{ task: { updatedAt: getOrderDirection(updatedAt || "desc") } }]
+            : []),
+          ...(getOrderDirection(createdAt!)
+            ? [{ task: { createdAt: getOrderDirection(createdAt || "desc") } }]
+            : []),
+          { createdAt: "desc" },
+        ],
+      });
+
+      const tasks = transformUserTaskApplications(taskApplications);
+
+      return {
+        tasks,
+        message: "Successfully Retrieved User tasks",
+        error: null,
+        status: 200,
+      };
+    } catch (error) {
+      return {
+        tasks: null,
+        message: "No user tasks found",
+        error,
+        status: 500,
+      };
+    }
+  }
+  return {
+    tasks: null,
+    message: "No user tasks found",
+    error: "No user role provided",
+    status: 500,
+  };
 };
 
 export const deleteUserTaskApplication = async (
@@ -145,38 +192,6 @@ export const deleteUserTaskApplication = async (
     return {
       deletedApplication: null,
       message: "Failed to delete user task application",
-      error,
-      status: 500,
-    };
-  }
-};
-
-export const getCharityTasks = async (charityId: string) => {
-  if (charityId.length < 0) {
-    return {
-      tasks: [],
-      message: "Please provide a charity id",
-      error: "No charity Id provided ",
-      status: 400,
-    };
-  }
-  try {
-    const tasks = await prisma.tasks.findMany({
-      where: { charityId: charityId },
-      include: { taskApplications: true, charity: true, createdBy: true },
-    });
-    // console.log("returned", tasks);
-
-    return {
-      tasks,
-      message: "Successfully Retrieved User tasks",
-      error: null,
-      status: 200,
-    };
-  } catch (error) {
-    return {
-      tasks: null,
-      message: "No user tasks found",
       error,
       status: 500,
     };

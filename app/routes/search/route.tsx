@@ -51,7 +51,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       ...(getOrderDirection(updatedAt)
         ? [{ updatedAt: getOrderDirection(updatedAt) }]
         : []),
-      { createdAt: "desc" }, 
+      { createdAt: "desc" },
     ],
   });
   console.log(filteredTasks);
