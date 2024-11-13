@@ -1,6 +1,6 @@
-import { LoaderFunctionArgs } from "@remix-run/node";
+import { LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { useFetcher, useLoaderData } from "@remix-run/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { DropdownCard } from "~/components/cards/FilterCard";
 import TaskSummaryCard from "~/components/cards/taskCard";
 import Navbar from "~/components/navigation/Header2";
@@ -16,30 +16,72 @@ import {
   urgencyOptions,
 } from "~/components/utils/OptionsForDropdowns";
 import Dropdown from "~/components/utils/selectDropdown";
-import { getAllTasks } from "~/models/tasks.server";
+import { getAllTasks, getExploreTasks } from "~/models/tasks.server";
 import { getUserInfo } from "~/models/user2.server";
 import { getSession } from "~/services/session.server";
+import type { Task } from "~/types/tasks";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getSession(request);
   const accessToken = session.get("accessToken");
-  const { allTasks } = await getAllTasks();
+  const url = new URL(request.url);
+  let cursor = url.searchParams.get("cursor");
+  const limit = parseInt(url.searchParams.get("limit") || "10", 2);
+
+  const category = url.searchParams.get("charity")?.split(",") || [];
+  const skills = url.searchParams.get("skills")?.split(",") || [];
+  const [urgency] = url.searchParams.get("urgency")?.split(",") || [];
+  const [status] = url.searchParams.get("status")?.split(",") || [];
+  const [deadline] = url.searchParams.get("deadline")?.split(",") || "";
+  const [createdAt] = url.searchParams.get("createdAt")?.split(",") || "";
+  const [updatedAt] = url.searchParams.get("updatedAt")?.split(",") || "";
+  console.log(category);
+
+  const { tasks, nextCursor } = await getExploreTasks(
+    cursor,
+    limit,
+    category,
+    skills,
+    urgency,
+    status,
+    deadline,
+    createdAt,
+    updatedAt,
+  );
+  console.log("Loader", tasks, "next", nextCursor);
+
   if (!accessToken) {
-    return { allTasks, message: "No access token found", userInfo: null };
+    redirect("/zitlogin");
+    return {
+      tasks: null,
+      userInfo: null,
+      nextCursor: null,
+    };
   }
   const { userInfo } = await getUserInfo(accessToken);
 
-  // console.log("First", allTasks);
-
-  return { allTasks, userInfo };
+  return {
+    tasks,
+    userInfo,
+    nextCursor,
+  };
 }
 
 export default function Explore() {
-  const { userInfo } = useLoaderData<typeof loader>();
-  const [showClearFilters, setShowClearFilters] = useState<boolean>();
-  const fetcher = useFetcher();
+  const {
+    userInfo,
+    tasks: initialTasks,
+    nextCursor: initialCursor,
+  } = useLoaderData<typeof loader>();
+  const fetchTasks = useFetcher();
+  const [tasks, setTasks] = useState<Task[]>();
+  const [cursor, setCursor] = useState<string | null>(initialCursor || null);
+  const [isLoading, setIsLoading] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const [isFilterChange, setIsFilterChange] = useState(false);
+  const [showClearFilters, setShowClearFilters] = useState(false)
 
-  // State to store selected filter options
+  // state to store selected filter options
   const [filters, setFilters] = useState({
     skills: [],
     charity: [],
@@ -49,6 +91,58 @@ export default function Explore() {
     createdAt: [],
     updatedAt: [],
   });
+
+  // Load initial tasks on component mount
+  useEffect(() => {
+    setTasks(initialTasks as Task[]);
+    loadMoreTasks();
+  }, []);
+
+  const buildSearchParams = (currentCursor: string | null = null) => {
+    return new URLSearchParams({
+      skills: filters.skills.join(","),
+      charity: filters.charity.join(","),
+      status: filters.status.join(","),
+      urgency: filters.urgency.join(","),
+      deadline: filters.deadline.join(","),
+      createdAt: filters.createdAt.join(","),
+      updatedAt: filters.updatedAt.join(","),
+      ...(currentCursor && { cursor: currentCursor }),
+    });
+  };
+  const loadMoreTasks = useCallback(() => {
+    if (isLoading || cursor === null || isFilterChange) return;
+    setIsLoading(true);
+    const searchParams = buildSearchParams(cursor);
+    fetchTasks.load(`/explore?${searchParams.toString()}`);
+  }, [cursor, isLoading, fetchTasks, isFilterChange, filters]);
+
+  // Setup intersection observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (
+          entries[0].isIntersecting &&
+          !isLoading &&
+          cursor !== null &&
+          !isFilterChange
+        ) {
+          loadMoreTasks();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      if (loadMoreRef.current) {
+        observer.unobserve(loadMoreRef.current);
+      }
+    };
+  }, [loadMoreTasks, isLoading, cursor]);
 
   const clearFilters = () => {
     setFilters({
@@ -64,7 +158,7 @@ export default function Explore() {
 
   const sortList = ["deadline", "createdAt", "updatedAt"];
 
-  // Function to handle option selection
+  // function to handle option selection
   const onSelect = (option: string, selected: boolean, filter: string) => {
     if (sortList.includes(filter)) {
       setFilters((preValue) => {
@@ -94,25 +188,40 @@ export default function Explore() {
           [filter]: updatedOptions, // update the specific filter type
         };
       } else {
-        const updatedOptions = isSelected ? "" : option;
+        const updatedOptions = selected ? option : "";
         return { ...prevFilters, [filter]: [updatedOptions] };
       }
     });
   };
 
   // use effect to trigger search when filters change
+  // Handle filter changes
   useEffect(() => {
-    fetcher.load(
-      `/search?skills=${filters.skills.join(",")}&charity=${filters.charity.join(",")}&deadline=${filters.deadline.join(",")}&status=${filters.status.join(",")}&urgency=${filters.urgency.join(",")}&createdAt=${filters.createdAt.join(",")}&updatedAt=${filters.updatedAt.join(",")}`,
+    const handleFilterChange = async () => {
+      setIsFilterChange(true);
+      setIsLoading(true);
+      const searchParams = buildSearchParams(null);
+      fetchTasks.load(`/explore?${searchParams.toString()}`);
+    };
+    const isFiltersEmpty = Object.values(filters).every(
+      (property) => Array.isArray(property) && property.length === 0
     );
-    const checkFilters =
-      filters &&
-      Object.keys(filters).every(
-        (key) => Array.isArray(filters[key]) && filters[key].length === 0,
-      );
-    setShowClearFilters(!checkFilters);
-    console.log(filters);
-  }, [filters]); // re-run when filters change
+    setShowClearFilters(!isFiltersEmpty)
+    handleFilterChange();
+  }, [filters]);
+
+  useEffect(() => {
+    if (fetchTasks.data && fetchTasks.data.tasks) {
+      if (isFilterChange) {
+        setTasks(fetchTasks.data.tasks);
+        setIsFilterChange(false);
+      } else {
+        setTasks((prev) => [...prev, ...fetchTasks.data.tasks]);
+      }
+      setCursor(fetchTasks.data.nextCursor);
+      setIsLoading(false);
+    }
+  }, [fetchTasks.data]);
 
   const filterOptionsToggle = (handleToggle: () => void) => {
     return (
@@ -235,52 +344,55 @@ export default function Explore() {
           </div>
         </div>
         <div className="flex flex-row gap-2 flex-wrap m-auto w-full justify-center">
-          {fetcher.state === "loading" ? (
-            <svg
-              className="animate-spin h-5 w-5 mr-3 text-baseSecondary"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="#836953"
-                strokeWidth="4"
-              ></circle>
-              <path
-                className="opacity-75"
-                fill="#836953"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              ></path>
-            </svg>
-          ) : (
-            <>
-              {fetcher.data?.filteredTasks?.map((task) => (
-                <TaskSummaryCard
-                  key={task.id}
-                  title={task.title}
-                  category={task.category}
-                  deadline={new Date(task.deadline)}
-                  description={task.description}
-                  volunteersNeeded={task?.volunteersNeeded}
-                  urgency={task.urgency || "LOW"}
-                  requiredSkills={task.requiredSkills}
-                  status={task.status}
-                  id={task.id}
-                  impact={task.impact}
-                  charityId={task.charity?.id || null}
-                  deliverables={task.deliverables}
-                  resources={task.resources}
-                  userId={task.createdBy.id}
-                  charityName={task.charity?.name || ""}
-                  userName={task.createdBy?.name || ""}
-                />
-              ))}
-            </>
-          )}
+          {tasks?.map((task) => (
+            <TaskSummaryCard
+              key={task.id}
+              title={task.title}
+              category={task.category}
+              deadline={new Date(task.deadline)}
+              description={task.description}
+              volunteersNeeded={task?.volunteersNeeded}
+              urgency={task.urgency || "LOW"}
+              requiredSkills={task.requiredSkills}
+              status={task.status}
+              id={task.id}
+              impact={task.impact}
+              charityId={task.charity?.id || null}
+              deliverables={task.deliverables}
+              resources={task.resources}
+              userId={task.createdBy.id}
+              charityName={task.charity?.name || ""}
+              userName={task.createdBy?.name || ""}
+            />
+          ))}
+
+          <div ref={loadMoreRef} className="w-full flex justify-center p-4">
+            {isLoading && (
+              <svg
+                className="animate-spin h-5 w-5 text-baseSecondary"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="#836953"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="#836953"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                ></path>
+              </svg>
+            )}
+            {cursor === null && !isLoading && tasks.length > 0 && (
+              <p className="text-gray-500">No more tasks to load</p>
+            )}
+          </div>
         </div>
       </div>
       <div></div>

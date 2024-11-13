@@ -1,6 +1,6 @@
 import { tasks } from "@prisma/client";
 import { prisma } from "~/services/db.server";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, TaskStatus, TaskUrgency } from "@prisma/client";
 import { SortOrder } from "~/routes/search/route";
 import { transformUserTaskApplications } from "~/components/utils/DataTransformation";
 
@@ -51,9 +51,11 @@ export const createTask = async (
   }
 };
 
-export const getAllTasks = async () => {
-  try {
-    const allTasks = await prisma.tasks.findMany({
+export async function getAllTasks({ skip = 0, take = 12 } = {}) {
+  const [tasks, totalCount] = await Promise.all([
+    prisma.tasks.findMany({
+      skip,
+      take,
       include: {
         charity: {
           select: {
@@ -68,12 +70,91 @@ export const getAllTasks = async () => {
           },
         },
       },
-    });
-    return { allTasks, error: null, message: "Successfully fetched tasks" };
-  } catch (error) {
-    return { allTasks: null, error, message: "Unable to fetch tasks" };
+    }),
+    prisma.tasks.count(),
+  ]);
+
+  return {
+    allTasks: tasks,
+    totalCount,
+  };
+}
+
+export async function getExploreTasks(
+  cursor: string | null = null,
+  limit: number = 10,
+  category: string[],
+  skills: string[],
+  urgency: string,
+  status: string,
+  deadline: string,
+  createdAt: string,
+  updatedAt: string,
+) {
+  if (cursor === "null") {
+    cursor = null;
   }
-};
+  console.log("Filter", Boolean(category[0]), skills[0], urgency, status);
+  console.log("cursor", cursor);
+  console.log("deadline", deadline);
+  console.log("createdAt", createdAt);
+  console.log("updatedAt", updatedAt);
+
+  const whereClause = {
+    ...(category[0] && { category: { hasSome: category } }),
+    ...(skills[0] && { requiredSkills: { hasSome: skills } }),
+    ...(urgency !== "" && { urgency: { equals: urgency as TaskUrgency } }),
+    ...(status !== "" && { status: { equals: status as TaskStatus } }),
+  };
+
+  // for type safety, ensure order value is either asc or desc
+  const getOrderDirection = (value: string): SortOrder | undefined => {
+    return value === "asc" || value === "desc"
+      ? (value as SortOrder)
+      : undefined;
+  };
+
+  const tasks = await prisma.tasks.findMany({
+    take: limit,
+    where: whereClause,
+    skip: cursor ? 1 : 0,
+    cursor: cursor ? { id: cursor } : undefined,
+    orderBy: [
+      ...(getOrderDirection(deadline)
+        ? [{ deadline: getOrderDirection(deadline) }]
+        : []),
+      ...(getOrderDirection(createdAt)
+        ? [{ createdAt: getOrderDirection(createdAt) }]
+        : [{ createdAt: "desc" as SortOrder }]),
+      ...(getOrderDirection(updatedAt)
+        ? [{ updatedAt: getOrderDirection(updatedAt) }]
+        : []),
+    ],
+    include: {
+      charity: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
+
+  const nextCursor = tasks.length === limit ? tasks[tasks.length - 1].id : null;
+
+  console.log(tasks);
+
+  return {
+    tasks,
+    nextCursor,
+  };
+}
 
 export const getUserTasks = async (
   userRole: string,

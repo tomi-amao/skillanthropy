@@ -6,6 +6,9 @@ export type SortOrder = "asc" | "desc";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
+  const page = parseInt(url.searchParams.get("page") || "1");
+  const ITEMS_PER_PAGE = 12;
+
   const category = url.searchParams.get("charity")?.split(",") || [];
   const skills = url.searchParams.get("skills")?.split(",") || [];
   const [urgency] = url.searchParams.get("urgency")?.split(",") || [];
@@ -20,41 +23,52 @@ export async function loader({ request }: LoaderFunctionArgs) {
       : undefined;
   };
 
-  const filteredTasks = await prisma.tasks.findMany({
-    where: {
-      ...(category[0] !== "" && { category: { hasSome: category } }),
-      ...(skills[0] !== "" && { requiredSkills: { hasSome: skills } }),
-      ...(urgency !== "" && { urgency: { equals: urgency as TaskUrgency } }),
-      ...(status !== "" && { status: { equals: status as TaskStatus } }),
-    },
-    include: {
-      charity: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-      createdBy: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-    },
-    orderBy: [
-      ...(getOrderDirection(deadline)
-        ? [{ deadline: getOrderDirection(deadline) }]
-        : []),
-      ...(getOrderDirection(createdAt)
-        ? [{ createdAt: getOrderDirection(createdAt) }]
-        : []),
-      ...(getOrderDirection(updatedAt)
-        ? [{ updatedAt: getOrderDirection(updatedAt) }]
-        : []),
-      { createdAt: "desc" },
-    ],
-  });
-  console.log(filteredTasks);
+  const whereClause = {
+    ...(category[0] !== "" && { category: { hasSome: category } }),
+    ...(skills[0] !== "" && { requiredSkills: { hasSome: skills } }),
+    ...(urgency !== "" && { urgency: { equals: urgency as TaskUrgency } }),
+    ...(status !== "" && { status: { equals: status as TaskStatus } }),
+  };
 
-  return { filteredTasks };
+  const [filteredTasks, totalCount] = await Promise.all([
+    prisma.tasks.findMany({
+      where: whereClause,
+      include: {
+        charity: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: [
+        ...(getOrderDirection(deadline)
+          ? [{ deadline: getOrderDirection(deadline) }]
+          : []),
+        ...(getOrderDirection(createdAt)
+          ? [{ createdAt: getOrderDirection(createdAt) }]
+          : []),
+        ...(getOrderDirection(updatedAt)
+          ? [{ updatedAt: getOrderDirection(updatedAt) }]
+          : []),
+        { createdAt: "desc" },
+      ],
+      skip: (page - 1) * ITEMS_PER_PAGE,
+      take: ITEMS_PER_PAGE,
+    }),
+    prisma.tasks.count({ where: whereClause }),
+  ]);
+
+  return {
+    filteredTasks,
+    totalCount,
+    page,
+    hasMore: filteredTasks.length === ITEMS_PER_PAGE,
+  };
 }

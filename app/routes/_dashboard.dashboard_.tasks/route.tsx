@@ -93,7 +93,7 @@ export default function TaskList() {
     userId,
   } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
-  const fetchTaskApplications = useFetcher();
+  const fetchTasks = useFetcher();
 
   const [tasks, setTasks] = useState(initialTasks);
   const [selectedTask, setSelectedTask] = useState<Partial<tasks> | null>();
@@ -392,8 +392,6 @@ export default function TaskList() {
           [filter]: updatedOptions, // update the specific filter type
         };
       } else {
-        console.log(option, "is selected", selected);
-
         const updatedOptions = selected ? option : "";
         return { ...prevFilters, [filter]: [updatedOptions] };
       }
@@ -469,7 +467,7 @@ export default function TaskList() {
       }
     });
 
-    fetchTaskApplications.load(`${url.pathname}${url.search}`);
+    fetchTasks.load(`${url.pathname}${url.search}`);
 
     console.log("Sort method", filterSort.deadline);
   }, [filterSort]);
@@ -484,16 +482,16 @@ export default function TaskList() {
     });
   };
 
-  const fetchSearchedApplications = useFetcher();
+  const fetchSearchedTasks = useFetcher();
   useEffect(() => {
     console.log(search);
     const baseURL = "/dashboard/tasks";
 
     const url = new URL(baseURL, window.location.origin);
     url.searchParams.append("search", search.query);
-    fetchSearchedApplications.load(`${url.pathname}${url.search}`);
+    fetchSearchedTasks.load(`${url.pathname}${url.search}`);
     const searchedUserTasks =
-      fetchSearchedApplications.data?.tasks.rawSearchedDocuments;
+      fetchSearchedTasks.data?.tasks.rawSearchedDocuments;
     if (searchedUserTasks) {
       searchedUserTasks.map((task) => {
         console.log(task.data);
@@ -502,8 +500,8 @@ export default function TaskList() {
   }, [search]);
 
   const tasksToDisplay =
-    fetchSearchedApplications.data?.tasks.rawSearchedDocuments ||
-    fetchTaskApplications.data?.tasks ||
+    fetchSearchedTasks.data?.tasks.rawSearchedDocuments ||
+    fetchTasks.data?.tasks ||
     initialTasks;
 
   return (
@@ -544,7 +542,7 @@ export default function TaskList() {
         </div>
 
         <ul className=" lg:space-y-0 text-baseSecondary">
-          {fetchTaskApplications.state === "loading" ? (
+          {fetchTasks.state === "loading" ? (
             <svg
               className="animate-spin h-5 w-5 mr-3 text-baseSecondary "
               xmlns="http://www.w3.org/2000/svg"
