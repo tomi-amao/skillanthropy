@@ -3,6 +3,7 @@ import {
   LoaderFunctionArgs,
   json,
   redirect,
+  MetaFunction,
 } from "@remix-run/node";
 import {
   useFetcher,
@@ -37,7 +38,6 @@ import TaskManagementActions from "~/components/tasks/TaskManagementActions";
 import { SortOrder } from "../search/route";
 import { useEffect, useMemo, useState } from "react";
 import TaskForm from "~/components/tasks/TaskForm";
-import { ServerRuntimeMetaFunction as MetaFunction } from "@remix-run/server-runtime";
 import { getCompanionVars } from "~/services/env.server";
 import {
   deleteNovuSubscriber,
@@ -59,13 +59,22 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (!accessToken) {
     return redirect("/zitlogin");
   }
-  const { userInfo } = await getUserInfo(accessToken);
+  const { userInfo, charityMemberships } = await getUserInfo(accessToken);
   if (!userInfo?.id) {
     return redirect("/zitlogin");
   }
 
   const companionVars = getCompanionVars();
   const { id: userId, roles: userRole, charityId, name } = userInfo;
+
+  // Extract user's charities from charity memberships for the dropdown
+  const userCharities =
+    charityMemberships?.memberships
+      ?.filter((membership) => membership.roles.includes("admin"))
+      .map((membership) => ({
+        id: membership.charity.id,
+        name: membership.charity.name,
+      })) || [];
 
   const url = new URL(request.url);
   const deadline = url.searchParams.get("deadline");
@@ -99,6 +108,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       userName: name,
       uploadURL: companionVars.COMPANION_URL,
       GCPKey: process.env.GOOGLE_MAPS_API_KEY,
+      userCharities, // Add userCharities to the response
     });
   } catch (error) {
     return json({
@@ -109,6 +119,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       isLoading: false,
       userName: null,
       uploadURL: null,
+      userCharities: [], // Include empty userCharities array
     });
   }
 }
@@ -121,6 +132,7 @@ export default function ManageTasks() {
     userName,
     uploadURL,
     GCPKey,
+    userCharities = [], // Extract userCharities from loader data with default empty array
   } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -317,7 +329,7 @@ export default function ManageTasks() {
       <AnimatePresence mode="wait">
         {!isDetailsView && (
           <motion.div
-            className="lg:w-1/3 w-full p-4 shadow-md space-y-4 rounded-md border border-basePrimaryDark overflow-auto"
+            className="lg:w-1/3 w-full p-4  space-y-4 rounded-md border border-basePrimaryDark overflow-auto"
             initial={{ opacity: 0, x: isMobile ? -40 : 0 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -40 }}
@@ -396,6 +408,8 @@ export default function ManageTasks() {
                   isSubmitting={fetcher.state === "submitting"}
                   uploadURL={uploadURL}
                   GCPKey={GCPKey}
+                  userCharities={userCharities}
+                  defaultCharityId={optimisticTask.charityId}
                 />
               ) : (
                 <TaskDetails
@@ -432,6 +446,10 @@ export default function ManageTasks() {
             isSubmitting={taskFormFetcher.state === "submitting"}
             uploadURL={uploadURL}
             GCPKey={GCPKey}
+            userCharities={userCharities}
+            defaultCharityId={
+              userCharities.length === 1 ? userCharities[0].id : ""
+            }
           />
         </div>
       )}
